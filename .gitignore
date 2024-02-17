@@ -1,0 +1,17 @@
+# Logs
+logs
+*.log
+allure-report
+allure-results
+
+# Dependency directories
+node_modules/
+
+# Output of 'npm pack'
+*.tgz
+
+# dotenv environment variables file
+.env
+
+# WebdriverIO files
+.vscode
