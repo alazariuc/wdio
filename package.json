@@ -7,10 +7,12 @@
   "scripts": {
     "test": "wdio run wdio.sauce.conf.ts",
     "test:local": "wdio run wdio.local.conf.ts",
-    "test:sauce": "wdio run wdio.sauce.conf.ts"
+    "test:sauce": "wdio run wdio.sauce.conf.ts",
+    "debug": "set DEBUG=true&&wdio run wdio.local.conf.ts"
   },
   "devDependencies": {
     "@types/jasmine": "^5.1.4",
+    "@wdio/allure-reporter": "^8.39.0",
     "@wdio/cli": "^8.27.1",
     "@wdio/globals": "^8.27.0",
     "@wdio/jasmine-framework": "^8.27.0",
