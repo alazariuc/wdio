@@ -40,6 +40,10 @@ export const config: Omit<WebdriverIO.Config, 'capabilities'> = {
   specs: [
     './test/specs/**/*.ts'
   ],
+  suites: {
+    chapter3: ['./test/specs/chapter3.ts'],
+    chapter4: ['./test/specs/chapter4.ts']
+  },
   // Patterns to exclude.
   exclude: [
     // 'path/to/excluded/files'
