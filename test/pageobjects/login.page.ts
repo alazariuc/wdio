@@ -170,7 +170,7 @@ class LoginPage extends Page {
      * missing await so the click executes before the setValue
      */
     public login_sync(username: string, password: string) {
-        // global.log(`Logging in with "${username}" and password"`)
+        global.log(`Logging in with "${username}" and password"`)
         this.inputUsername.setValue(username);
         this.inputPassword.setValue(password);
         this.btnSubmit.click();
