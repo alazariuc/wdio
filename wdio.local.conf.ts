@@ -9,5 +9,6 @@ export const config: WebdriverIO.Config = {
                 args: ['headless', 'disable-gpu']
             }
         }]
-    }
+    },
+    
 }

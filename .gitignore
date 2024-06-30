@@ -15,3 +15,6 @@ node_modules/
 
 # WebdriverIO files
 .vscode
+
+# temporary files
+exampletest/
