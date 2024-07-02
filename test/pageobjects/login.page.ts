@@ -108,17 +108,17 @@ class LoginPage extends Page {
      * a method to unit test the failure of an button that does not exist
      * e.g. to login using username and password
      */
-    // public async stalelogin(username: string, password: string) {
-    //     await helpers.log(`Logging in with "${username}" and password"`);
-    //     await helpers.setValueAdv(await this.staleInputUsername, username);
-    //     await helpers.log(`Entered "${username}"`);
-    //     await helpers.setValueAdv(await this.staleInputPassword, password);
-    //     await helpers.log(
-    //         `Entered password and clicking Submit with ClickAdv`
-    //     );
-    //     // Submit button that changed class from link anchor to button in last release
-    //     await helpers.clickAdv(await this.staleSubmitLink);
-    // }
+    public async stalelogin(username: string, password: string) {
+        await helpers.log(`Logging in with "${username}" and password"`);
+        await helpers.setValueAdv(await this.staleInputUsername, username);
+        await helpers.log(`Entered "${username}"`);
+        await helpers.setValueAdv(await this.staleInputPassword, password);
+        await helpers.log(
+            `Entered password and clicking Submit with ClickAdv`
+        );
+        // Submit button that changed class from link anchor to button in last release
+        await helpers.clickAdv(await this.staleSubmitLink);
+    }
 
     /**
      * a method to unit test the failure of an button that does not exist

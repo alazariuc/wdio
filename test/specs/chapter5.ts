@@ -75,3 +75,13 @@ describe("Chapter 5: Pass with clickAdvIfExists", () => {
     await expect(SecurePage.flashAlert).toHaveText(expect.stringContaining("You logged into a secure area!"));
   });
 });
+
+describe("Chapter 5: Self heal element", () => {
+
+  it("will pass as the stale element and framework will attempt to self heal", async () => {
+    LoginPage.open();
+    await LoginPage.stalelogin("tomsmith", "SuperSecretPassword!");
+    await expect(SecurePage.flashAlert).toBeExisting();
+    await expect(SecurePage.flashAlert).toHaveText(expect.stringContaining("You logged into a secure area!"));
+  });
+});
