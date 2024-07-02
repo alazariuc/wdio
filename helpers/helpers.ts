@@ -1,8 +1,4 @@
-/* Updates for 2024!
- expect(el).toHaveTextContainingContaining() is being depreciated. 
- Replace with expect(el).toHaveText(expect.stringContaining('...')))
-*/
-// import { ASB } from "./globalObjects";
+import { ASB } from "./globalObjects.js";
 import allureReporter from "@wdio/allure-reporter";
 
 
@@ -23,64 +19,64 @@ import allureReporter from "@wdio/allure-reporter";
 //   return await element.click();
 // }
 
-// const IF_EXISTS = "IF_EXISTS";
-// export async function clickAdvIfExists(element: WebdriverIO.Element | string) {
-//   ASB.set(IF_EXISTS, true);
-//   let result = await this.clickAdv(element);
-//   ASB.set(IF_EXISTS, false);
-//   return result;
-// }
+const IF_EXISTS = "IF_EXISTS";
+export async function clickAdvIfExists(element: WebdriverIO.Element) {
+  ASB.set(IF_EXISTS, true);
+  let result = await clickAdv(element);
+  ASB.set(IF_EXISTS, false);
+  return result;
+}
 
-// export async function clickAdv(element: WebdriverIO.Element | string) {
-//   let success: boolean = false;
-//   let errorMessage: string = "";
-//   let selector: string = "";
+export async function clickAdv(element: WebdriverIO.Element) {
+  let success: boolean = false;
+  let errorMessage: string = "";
+  let selector: string = "";
 
-//   // Self-healing element
-//   element = await getValidElement(element, "button");
+  // Self-healing element
+  //element = await getValidElement(element, "button");
+  if (await isExists(element)) {
+    ASB.set("ELEMENT_EXISTS", true);
+  }
 
-//   if (ASB.get("ELEMENT_EXISTS") === true) {
-//     // Element exists
+  if (ASB.get("ELEMENT_EXISTS") === true) {
+    // Element exists
 
-//     selector = element.selector.toString();
-//     await log(`Clicking selector "${selector}"`);
-//     try {
-//       if (!(await this.isElementInViewport(element))) {
-//         await this.scrollIntoView(element);
-//         await this.waitForElementToStopMoving(element, 3000);
-//       }
-//       await this.highlightOn(element);
-//       //@ts-ignore
-//       await element.click(); // ({ block: "center" });
-//       await this.pageSync();
-//       success = true;
-//       await log(`  PASS: Clicked selector "${ASB.get("SELECTOR")}"`);
-//     } catch (error: any) {
-//       errorMessage = error.message;
+    selector = element.selector.toString();
+    await log(`Clicking selector "${selector}"`);
+    try {
+      if (!(await isElementInViewport(element))) {
+        await scrollIntoView(element);
+        // await waitForElementToStopMoving(element, 3000);
+      }
+      await highlightOn(element);
+      await element.click(); // ({ block: "center" });
+      await pageSync();
+      success = true;
+      await log(`  PASS: Clicked selector "${selector}"`);
+    } catch (error: any) {
+      errorMessage = error.message;
+    }
 
-//     }
-
-//   } else {
-//     // Element does not exist, but do not fail the test
-//     if (ASB.get(IF_EXISTS) === true) {
-
-//       await log(`  WARN: ClickIfExists - Skipped clicking selector "${ASB.get("SELECTOR")}" without failing the test`);
-//       ASB.set(IF_EXISTS, false)
-//       success = true;
-
-//     } else {
-//       // Element does not exist, fail the test
-//       await log(`  FAIL: Selector "${ASB.get("SELECTOR")}" was not clicked.\n       ${errorMessage}`);
-
-//       // Descriptive fail message
-//       await expect(ASB.get("SELECTOR")).toEqual(' to exist and be clickable');
-//       // Throw the error to stop the test
-//       //@ts-ignore
-//       await element.click()
-//     }
-//   }
-//   return success;
-// }
+  } else {
+    // Element does not exist, but do not fail the test
+    if (ASB.get(IF_EXISTS) === true) {
+      await log(`  WARN: ClickIfExists - Skipped clicking selector "${element.selector}" without failing the test`);
+      ASB.set(IF_EXISTS, false)
+      success = true;
+    } else {
+      // Descriptive fail message
+      await expect(element.selector).toEqual('to exist and be clickable');
+      // Throw the error to stop the test
+      await element.click().catch(async (error: any) => {
+        // Element does not exist, fail the test
+      await log(`  FAIL: Selector "${element.selector}" was not clicked.\n       ${error.message}`);
+      throw error;
+      });
+    }
+  }
+  ASB.set("ELEMENT_EXISTS", false);
+  return success;
+}
 
 
 export async function findVisibleElement(locators: string[], elementName: string): Promise<WebdriverIO.Element | null> {
@@ -202,12 +198,12 @@ export async function findListElement(elementName: string): Promise<WebdriverIO.
 //   elementType: string
 // ): Promise<WebdriverIO.Element> {
 //   let found: boolean = true;
-//   let element: WebdriverIO.Element;
+//   let element: WebdriverIO.Element | null = null;
 
 //   let newSelector: string = "";
-//   let newElement: any = element;
+//   let newElement: WebdriverIO.Element | null = null;
 
-//   let elements: WebdriverIO.Element[];
+//   let elements: WebdriverIO.ElementArray | null = null;
 //   let normalizedElementType: string = "";
 //   let elementName: string = "";
 //   //Find as string 
@@ -273,9 +269,7 @@ export async function findListElement(elementName: string): Promise<WebdriverIO.
 //         ASB.set("SELECTOR", selector);
 
 //         break;
-
 //     }
-
 
 //     elements = await browser.$$(selector);
 //     found = elements.length > 0;
@@ -531,36 +525,36 @@ export function getToday(offset: number = 0, format: string = "dd-mm-yyyy") {
   });
 }
 
-// export async function highlightOn(
-//   element: WebdriverIO.Element,
-//   color: string = "green"
-// ): Promise<boolean> {
-//   let ELEMENT_SELECTOR: any;
-//   let visible: boolean = true;
-//   try {
-//     ELEMENT_SELECTOR = await element.selector;
-//     try {
-//       await browser.execute(
-//         `arguments[0].style.border = '5px solid ${color}';`,
-//         element
-//       );
-//       visible = await isElementVisible(element);
-//     } catch (error: any) {
-//       // Handle stale element
-//       const newElement = await browser.$(ELEMENT_SELECTOR);
-//       ASB.set("element", newElement);
-//       ASB.set("staleElement", true);
-//       await browser.execute(
-//         `arguments[0].style.border = '5px solid ${color}';`,
-//         newElement
-//       );
-//     }
-//   } catch (error) {
-//     // Element no longer exists
-//     visible = false;
-//   }
-//   return visible;
-// }
+export async function highlightOn(
+  element: WebdriverIO.Element,
+  color: string = "green"
+): Promise<boolean> {
+  let ELEMENT_SELECTOR: any;
+  let visible: boolean = true;
+  try {
+    ELEMENT_SELECTOR = await element.selector;
+    try {
+      await browser.execute(
+        `arguments[0].style.border = '5px solid ${color}';`,
+        element
+      );
+      visible = await isElementVisible(element);
+    } catch (error: any) {
+      // Handle stale element
+      const newElement = await browser.$(ELEMENT_SELECTOR);
+      ASB.set("element", newElement);
+      ASB.set("staleElement", true);
+      await browser.execute(
+        `arguments[0].style.border = '5px solid ${color}';`,
+        newElement
+      );
+    }
+  } catch (error) {
+    // Element no longer exists
+    visible = false;
+  }
+  return visible;
+}
 
 export async function highlightOff(
   element: WebdriverIO.Element
@@ -633,80 +627,79 @@ const ANSI_LOCATOR = `\x1b[38;2;200;150;255m`  // Light Purple
 const ANSI_STRING = `\x1b[38;2;173;216;230m`  // Light Blue TEXT entered into a field
 const ANSI_TEXT = `\x1b[97m`  // White TEXT
 const ANSI_RESET = `\x1b[0m` //Reset
-// ASB.set("ANSI_COLOR", ANSI_RESET);
+ASB.set("ANSI_COLOR", ANSI_RESET);
 let LAST_MESSAGE: string = "";
 let LAST_MESSAGE_COUNT: number = 0;
-// ASB.set("LAST_MESSAGE_COUNT", 0);
-// ASB.set("LAST_MESSAGE", "");
+ASB.set("LAST_MESSAGE_COUNT", 0);
+ASB.set("LAST_MESSAGE", "");
 
-// export async function log(message: any): Promise<void> {
-//   //Skip repeated messages
+export async function log(message: any): Promise<void> {
+  //Skip repeated messages
+  LAST_MESSAGE = ASB.get("LAST_MESSAGE");
+  LAST_MESSAGE_COUNT = ASB.get("LAST_MESSAGE_COUNT");
 
-//   LAST_MESSAGE = ASB.get("LAST_MESSAGE");
-//   LAST_MESSAGE_COUNT = ASB.get("LAST_MESSAGE_COUNT");
+  if (LAST_MESSAGE === message) {
 
-//   if (LAST_MESSAGE === message) {
+    ASB.set("LAST_MESSAGE_COUNT", LAST_MESSAGE_COUNT++);
+    return;
+  }
 
-//     ASB.set("LAST_MESSAGE_COUNT", LAST_MESSAGE_COUNT++);
-//     return;
-//   }
+  if (LAST_MESSAGE_COUNT > 0) {
+    console.log(`   └ ─ >   This message repeated ${LAST_MESSAGE_COUNT} times`);
+    ASB.set("LAST_MESSAGE_COUNT", 0);
+  }
 
-//   if (LAST_MESSAGE_COUNT > 0) {
-//     console.log(`   └ ─ >   This message repeated ${LAST_MESSAGE_COUNT} times`);
-//     ASB.set("LAST_MESSAGE_COUNT", 0);
-//   }
+  ASB.set("LAST_MESSAGE", message);
 
-//   ASB.set("LAST_MESSAGE", message);
+  // Append a space to the message to allow regex to work correcty
+  let messageString: string = message + " ";
 
-//   // Append a space to the message to allow regex to work correcty
-//   let messageString: string = message + " ";
+  try {
+    if (typeof message === "string" || typeof message === "number") {
+      if (message) {
 
-//   try {
-//     if (typeof message === "string" || typeof message === "number") {
-//       if (message) {
+        if (messageString.toString().includes(`[object Promise]`)) {
+          messageString = (`--->  WARN: ${message} \n      Promise object detected. async function call missing await keyword.`);
+          console.trace();
+        }
 
-//         if (messageString.toString().includes(`[object Promise]`)) {
-//           messageString = (`--->  WARN: ${message} \n      Promise object detected. async function call missing await keyword.`);
-//           console.trace();
-//         }
+        if (messageString.includes("WARN: ")) {
+          messageString = ANSI_WARNING + messageString + " " + ANSI_RESET
+          ASB.set("ANSI_COLOR", ANSI_WARNING);
+        } else if (messageString.includes("FAIL: ") || messageString.includes("ERROR: ") || messageString.includes("Promise")) {
+          messageString = ANSI_FAIL + messageString + " " + ANSI_RESET
+          ASB.set("ANSI_COLOR", ANSI_FAIL);
+        } else if (messageString.includes("PASS: ")) {
+          // PASS
+          messageString = ANSI_PASS + message + " "
+          ASB.set("ANSI_COLOR", ANSI_PASS);
+        } else {
+          messageString = ANSI_TEXT + message + " " + ANSI_RESET
+          ASB.set("ANSI_COLOR", ANSI_RESET);
+        }
 
-//         if (messageString.includes("WARN: ")) {
-//           messageString = ANSI_WARNING + messageString + " " + ANSI_RESET
-//           ASB.set("ANSI_COLOR", ANSI_WARNING);
-//         } else if (messageString.includes("FAIL: ") || messageString.includes("ERROR: ") || messageString.includes("Promise")) {
-//           messageString = ANSI_FAIL + messageString + " " + ANSI_RESET
-//           ASB.set("ANSI_COLOR", ANSI_FAIL);
-//         } else if (messageString.includes("PASS: ")) {
-//           // PASS
-//           messageString = ANSI_PASS + message + " "
-//           ASB.set("ANSI_COLOR", ANSI_PASS);
-//         } else {
-//           messageString = ANSI_TEXT + message + " " + ANSI_RESET
-//           ASB.set("ANSI_COLOR", ANSI_RESET);
-//         }
+        //Send colored content to Debug console
+        //Highlight CSS and XPath selectors in Purple case-insensitive to 'Selector' and 'selector'
+        // Set case ignore flag (i) and global flag (g) to replace all instances
+        let regex = /Selector ['"](.*?)['"] /ig;
 
-//         //Send colored content to Debug console
-//         //Highlight CSS and XPath selectors in Purple case-insensitive to 'Selector' and 'selector'
-//         // Set case ignore flag (i) and global flag (g) to replace all instances
-//         let regex = /Selector ['"](.*?)['"] /ig;
+        if (regex.test(messageString)) {
+          regex.lastIndex = 0; // Reset the regex index to make multiple passes
+          messageString = messageString.replace(regex, `selector "${ANSI_LOCATOR}$1${ASB.get("ANSI_COLOR")}" `);
 
-//         if (regex.test(messageString)) {
-//           regex.lastIndex = 0; // Reset the regex index to make multiple passes
-//           messageString = messageString.replace(regex, `selector "${ANSI_LOCATOR}$1${ASB.get("ANSI_COLOR")}" `);
-
-//         } else {
-//           // Highlight accent marks, single and double quoted strings surrounded in spaces in Blue
-//           messageString = messageString.replace(/ `([^`]+)` /g, ` \`${ANSI_STRING}$1${ASB.get("ANSI_COLOR")}\` `);
-//           messageString = messageString.replace(/ '([^`]+)' /g, ` '${ANSI_STRING}$1${ASB.get("ANSI_COLOR")}' `);
-//           messageString = messageString.replace(/ "([^"]+)" /g, ` "${ANSI_STRING}$1${ASB.get("ANSI_COLOR")}" `);
-//         }
-//         console.log(`--->   ${messageString} ${ANSI_RESET}`);
-//       }
-//     }
-//   } catch (error: any) {
-//     console.log(`--->   helpers.console(): ${error.message}`);
-//   }
-// }
+        } else {
+          // Highlight accent marks, single and double quoted strings surrounded in spaces in Blue
+          messageString = messageString.replace(/ `([^`]+)` /g, ` \`${ANSI_STRING}$1${ASB.get("ANSI_COLOR")}\` `);
+          messageString = messageString.replace(/ '([^`]+)' /g, ` '${ANSI_STRING}$1${ASB.get("ANSI_COLOR")}' `);
+          messageString = messageString.replace(/ "([^"]+)" /g, ` "${ANSI_STRING}$1${ASB.get("ANSI_COLOR")}" `);
+        }
+        console.log(`--->   ${messageString} ${ANSI_RESET}`);
+      }
+    }
+  } catch (error: any) {
+    console.log(`--->   helpers.console(): ${error.message}`);
+  }
+}
 
 /**
  * Masks the middle of the string with asterisks
@@ -763,99 +756,97 @@ function normalizeElementType(elementType: string) {
  */
 let LAST_URL: String = "";
 
-// export async function pageSync(
-//   ms: number = 25,
-//   waitOnSamePage: boolean = false
-// ): Promise<boolean> {
-//   await waitForSpinner();
+export async function pageSync(
+  ms: number = 25,
+  waitOnSamePage: boolean = false
+): Promise<boolean> {
+  await waitForSpinner();
 
-//   // Pessimistic result
-//   let result = false;
-//   let skipToEnd = false;
+  // Pessimistic result
+  let result = false;
+  let skipToEnd = false;
 
-//   // @ts-ignore
-//   let thisUrl = await browser.getUrl();
+  let thisUrl = await browser.getUrl();
 
-//   if (waitOnSamePage === false) {
-//     if (thisUrl === LAST_URL) {
-//       //skip rest of function
-//       result = true;
-//       skipToEnd = true;
-//     }
-//   }
+  if (waitOnSamePage === false) {
+    if (thisUrl === LAST_URL) {
+      //skip rest of function
+      result = true;
+      skipToEnd = true;
+    }
+  }
 
-//   if (skipToEnd === false) {
-//     LAST_URL = thisUrl;
-//     let visibleSpans: string = 'div:not([style*="visibility: hidden"])';
-//     let elements = await $$(visibleSpans);
-//     let exit: boolean = false;
-//     let count: number = elements.length;
-//     let lastCount: number = 0;
-//     let retries: number = 3;
-//     let retry: number = retries;
-//     let timeout: number = 5000; // 5 second timeout
-//     const startTime: number = Date.now();
+  if (skipToEnd === false) {
+    LAST_URL = thisUrl;
+    let visibleDivs: string = 'div:not([style*="visibility: hidden"])';
+    let elements = await $$(visibleDivs);
+    let exit: boolean = false;
+    let count: number = elements.length;
+    let lastCount: number = 0;
+    let retries: number = 3;
+    let retry: number = retries;
+    let timeout: number = 5000; // 5 second timeout
+    const startTime: number = Date.now();
 
-//     while (retry > 0) {
-//       if (lastCount != count) {
-//         retry = retries; // Reset the count of attempts
-//       }
+    while (retry > 0) {
+      if (lastCount != count) {
+        retry = retries; // Reset the count of attempts
+      }
 
-//       // Exit after 3 stable element counts
-//       if (retry == 0) {
-//         break;
-//       }
+      // Exit after 3 stable element counts
+      if (retry == 0) {
+        break;
+      }
 
-//       if (timeout-- === 0) {
-//         // await log("Page never settled");
-//         exit = true;
-//         break;
-//       }
+      if (timeout-- === 0) {
+        await log("Page never settled");
+        exit = true;
+        break;
+      }
 
-//       lastCount = count;
+      lastCount = count;
 
-//       // wait 1/4 sec before next count check
-//       await pause(ms);
+      // wait 1/4 sec before next count check
+      await pause(ms);
 
-//       try {
-//         elements = await $$(visibleSpans);
-//       } catch (error: any) {
-//         exit = true;
-//         switch (error.name) {
-//           case "TimeoutError":
-//             // await log(`ERROR: Timed out while trying to find visible spans.`);
-//             break;
-//           case "NoSuchElementError":
-//             // await log(`ERROR: Could not find any visible spans.`);
-//             break;
-//           default:
-//             if (error.message === `Couldn't find page handle`) {
-//             //   await log(`WARN: Browser closed. (Possibly missing await)`);
-//             }
-//         }
-//         // Error thrown: Exit loop
-//         break;
-//       }
+      try {
+        elements = await $$(visibleDivs);
+      } catch (error: any) {
+        exit = true;
+        switch (error.name) {
+          case "TimeoutError":
+            await log(`ERROR: Timed out while trying to find visible divs.`);
+            break;
+          case "NoSuchElementError":
+            await log(`ERROR: Could not find any visible divs.`);
+            break;
+          default:
+            if (error.message === `Couldn't find page handle`) {
+              await log(`WARN: Browser closed. (Possibly missing await)`);
+            }
+        }
+        // Error thrown: Exit loop
+        break;
+      }
 
-//       count = await elements.length;
-//       retry--;
-//     }
+      count = elements.length;
+      retry--;
+    }
 
-//     // Metric: Report if the page took more than 3 seconds to build
-//     const endTime = Date.now();
-//     const duration = endTime - startTime;
+    // Metric: Report if the page took more than 3 seconds to build
+    const endTime = Date.now();
+    const duration = endTime - startTime;
 
-//     if (duration > timeout) {
-//     //   await log(
-//     //     `  WARN: pageSync() completed in ${duration / 1000
-//     //     } sec  (${duration} ms) `
-//     //   );
-//     } else {
-//       //log(`  pageSync() completed in ${duration} ms`); // Optional debug messaging
-//     }
-//   }
-//   return result;
-// }
+    if (duration > timeout) {
+      await log(
+        `  WARN: pageSync() completed in ${duration / 1000} sec (${duration} ms)  `
+      );
+    } else {
+      await log(`  pageSync() completed in ${duration} ms`); // Optional debug messaging
+    }
+  }
+  return result;
+}
 
 // export async function setValueAdvIfExists(element: WebdriverIO.Element) {
 //   ASB.set(IF_EXISTS, true);
@@ -958,12 +949,12 @@ let LAST_URL: String = "";
  */
 export async function pause(ms: number) {
   if (ms > 500) {
-    // await log(`  Waiting ${ms} ms...`); // Custom log
+    await log(`  Waiting ${ms} ms...`); // Custom log
   }
 
-  const start = Date.now();
-  let now = start;
-  while (now - start < ms) {
+  const t0 = Date.now();
+  let now = t0;
+  while (now - t0 < ms) {
     now = Date.now();
   }
 }
@@ -1006,44 +997,44 @@ function replaceTags(text: string) {
   return newText;
 }
 
-// export async function scrollIntoView(element: WebdriverIO.Element) {
-//   await highlightOn(element);
-//   await element.scrollIntoView({ block: "center", inline: "center" });
+export async function scrollIntoView(element: WebdriverIO.Element) {
+  await highlightOn(element);
+  await element.scrollIntoView({ block: "center", inline: "center" });
 
-//   let viewportHeight = (await browser.getWindowSize()).height
-//   let lastY = 0;
+  let viewportHeight = (await browser.getWindowSize()).height
+  let lastY = 0;
 
-//   while (await isElementInViewport(element) === false) {
-//     // Check if object scrolled off the top of the page
-//     await waitForElementToStopMoving(element, 2000);
+  while (await isElementInViewport(element) === false) {
+    // Check if object scrolled off the top of the page
+    await waitForElementToStopMoving(element, 2000);
 
-//     let elementY = await getElementY(element);
+    let elementY = await getElementY(element);
 
-//     if (elementY < 0) {
-//       // scolls down and sets END_OF_PAGE if the element is at the bottom of the page
-//       scrollDown();
-//       // exit if the element is in the top 1/3 of the viewport
-//       if (elementY < (viewportHeight / 3)) {
-//         break;
-//       }
-//     } else {
-//       // Scrolls up and sets END_OF_PAGE if the element is at the top of the page
-//       scrollUp();
-//       // exit if the element is in the top 1/3 of the viewport
-//       if (elementY > (viewportHeight / 3)) {
-//         break;
-//       }
-//     }
+    if (elementY < 0) {
+      // scolls down and sets END_OF_PAGE if the element is at the bottom of the page
+      scrollDown();
+      // exit if the element is in the top 1/3 of the viewport
+      if (elementY < (viewportHeight / 3)) {
+        break;
+      }
+    } else {
+      // Scrolls up and sets END_OF_PAGE if the element is at the top of the page
+      scrollUp();
+      // exit if the element is in the top 1/3 of the viewport
+      if (elementY > (viewportHeight / 3)) {
+        break;
+      }
+    }
 
-//     // exit if the element never moved
-//     if (ASB.get("END_OF_PAGE") || (lastY === elementY)) {
-//       break;
-//     }
+    // exit if the element never moved
+    if (ASB.get("END_OF_PAGE") || (lastY === elementY)) {
+      break;
+    }
 
-//     lastY = elementY;
-//   }
-//   await highlightOff(element);
-// }
+    lastY = elementY;
+  }
+  await highlightOff(element);
+}
 
 // Get the Y coordinate of the element to determin if the scroll command worked
 export async function getElementY(element: WebdriverIO.Element)
@@ -1056,31 +1047,31 @@ export async function getElementY(element: WebdriverIO.Element)
   return rect.y;
 }
 
-// export async function scrollDown(scrollValue = 100) {
-//   await browser.execute(`window.scrollBy(0, ${scrollValue})`);
-//   await isEndOfPage();
-// }
+export async function scrollDown(scrollValue = 100) {
+  await browser.execute(`window.scrollBy(0, ${scrollValue})`);
+  await isEndOfPage();
+}
 
-// export async function scrollUp(scrollValue = 100) {
-//   await browser.execute(`window.scrollBy(0, -${scrollValue})`);
-//   await isEndOfPage();
-// }
+export async function scrollUp(scrollValue = 100) {
+  await browser.execute(`window.scrollBy(0, -${scrollValue})`);
+  await isEndOfPage();
+}
 
-// export async function isEndOfPage() {
-//   ASB.set("END_OF_PAGE", false);
+export async function isEndOfPage() {
+  ASB.set("END_OF_PAGE", false);
 
-//   let y = await $('//*').getLocation("y");
-//   if (ASB.get("LAST_Y") === y) {
-//     ASB.set("END_OF_PAGE", true);
-//   } else {
-//     ASB.set("LAST_Y", y)
-//   }
-// }
+  let y = await $('//*').getLocation("y");
+  if (ASB.get("LAST_Y") === y) {
+    ASB.set("END_OF_PAGE", true);
+  } else {
+    ASB.set("LAST_Y", y)
+  }
+}
 
 
 
 export async function sleep(ms: number) {
-//   await log(`Waiting ${ms} ms...`);
+  //   await log(`Waiting ${ms} ms...`);
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
@@ -1105,49 +1096,49 @@ export async function sleep(ms: number) {
 
 
 
-// export async function waitForSpinner(): Promise<boolean> {
-//   let spinnerDetected: boolean = false;
-//   // This spinner locator is unique to each project
-//   const spinnerLocator: string = `//img[contains(@src,'loader')]`;
-//   await pause(100); // Let browser begin building spinner on page
-//   let spinner = await browser.$(spinnerLocator);
-//   let found = await highlightOn(spinner);
-//   let timeout = ASB.get("spinnerTimeoutInSeconds");
-//   const start = Date.now();
-//   if (found) {
-//     const startTime = performance.now();
-//     // display this message in yellow
-//     await log(
-//       `  ${ANSI_WARNING}Spinner detected...`)
+export async function waitForSpinner(): Promise<boolean> {
+  let spinnerDetected: boolean = false;
+  // This spinner locator is unique to each project
+  const spinnerLocator: string = `//img[contains(@src,'loader')]`;
+  await pause(100); // Let browser begin building spinner on page
+  let spinner = await browser.$(spinnerLocator);
+  let found = await highlightOn(spinner);
+  let timeout = ASB.get("spinnerTimeoutInSeconds");
+  const t0 = Date.now();
+  if (found) {
+    const startTime = performance.now();
+    // display this message in yellow
+    await log(
+      `  ${ANSI_WARNING}Spinner detected...`)
 
-//     spinnerDetected = true;
-//     try {
-//       while (found) {
-//         found = await highlightOn(spinner);
-//         if (!found) break;
-//         await pause(100);
-//         found = await highlightOff(spinner);
-//         if (!found) break;
-//         await pause(100);
-//         if (Date.now() - start > timeout * 1000) {
-//           // custom log automatically displays this in red in console
-//           await log(`  ERROR: Spinner did not close after ${timeout} seconds`);
-//           break;
-//         }
-//       }
-//     } catch (error) {
-//       // Spinner no longer exists
-//     }
+    spinnerDetected = true;
+    try {
+      while (found) {
+        found = await highlightOn(spinner);
+        if (!found) break;
+        await pause(100);
+        found = await highlightOff(spinner);
+        if (!found) break;
+        await pause(100);
+        if (Date.now() - t0 > timeout * 1000) {
+          // custom log automatically displays this in red in console
+          await log(`  ERROR: Spinner did not close after ${timeout} seconds`);
+          break;
+        }
+      }
+    } catch (error) {
+      // Spinner no longer exists
+    }
 
-//     // Optional: Display a spinner completion message in Green in the console.
-//     await log(
-//       `  ${ANSI_PASS}Spinner Elapsed time: ${Math.floor(performance.now() - startTime)} ms (${Math.round((performance.now() - startTime) / 1000)} sec)`
-//     );
+    // Optional: Display a spinner completion message in Green in the console.
+    await log(
+      `  ${ANSI_PASS}Spinner Elapsed time: ${Math.floor(performance.now() - startTime)} ms (${Math.round((performance.now() - startTime) / 1000)} sec)`
+    );
 
-//   }
+  }
 
-//   return spinnerDetected;
-// }
+  return spinnerDetected;
+}
 
 // export async function selectAdvIfExists(element: WebdriverIO.Element) {
 //   ASB.set(IF_EXISTS, true);
