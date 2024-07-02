@@ -1,6 +1,6 @@
 import allureReporter from '@wdio/allure-reporter';
 import { config } from '../../wdio.shared.conf.js';
-import * as helpers from '../../helpers/helpers';
+import * as helpers from '../../helpers/helpers.js';
 
 /**
  * main page object containing all methods, selectors and functionality
@@ -18,18 +18,18 @@ export default class Page {
     public async open(path: string) {
         allureReporter.addAttachment('Navigating to url', path, 'string');
 
-        if (path.startsWith(`http`)) {
+        if (path.startsWith('http')) {
             await browser.url(path); // Overwrite the path
-        } else if (path.startsWith(`components`)) {
+        } else if (path.startsWith('components')) {
             await browser.url(`https://www.telerik.com/kendo-react-ui/${path}`);
-        } else if (path === ``) { //uses baseUrl from wdio.shared.conf.ts
+        } else if (path === '') { //uses baseUrl from wdio.shared.conf.ts
             await browser.url(`${browser.options.baseUrl}`);
         } else {
             return await browser.url(`${config.baseUrl}/${path}`);
         }
         
         // Wait for the landing page to load
-        // await helpers.pageSync();
+        await helpers.pageSync();
 
         let message: string = '';
         if (path.startsWith(`components`)) {
@@ -38,11 +38,11 @@ export default class Page {
         else {
             message = `Opening URL: ${config.baseUrl}/${path}`;
         }
-        // const line = '-'.repeat(message.length);
+        const line = '-'.repeat(message.length);
         
-        // global.log(line);
-        // global.log(message);
-        // global.log(line);
+        global.log(line);
+        global.log(message);
+        global.log(line);
     }
 
 

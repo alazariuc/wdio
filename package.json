@@ -27,5 +27,8 @@
     "ts-node": "^10.9.2",
     "typescript": "^5.3.3",
     "webdriverio": "^8.27.0"
+  },
+  "dependencies": {
+    "utility-types": "^3.11.0"
   }
 }
