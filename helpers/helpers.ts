@@ -33,14 +33,10 @@ export async function clickAdv(element: WebdriverIO.Element) {
   let selector: string = "";
 
   // Self-healing element
-  //element = await getValidElement(element, "button");
-  if (await isExists(element)) {
-    ASB.set("ELEMENT_EXISTS", true);
-  }
+  element = await getValidElement(element, "button");
 
   if (ASB.get("ELEMENT_EXISTS") === true) {
     // Element exists
-
     selector = element.selector.toString();
     await log(`Clicking selector "${selector}"`);
     try {
@@ -69,12 +65,11 @@ export async function clickAdv(element: WebdriverIO.Element) {
       // Throw the error to stop the test
       await element.click().catch(async (error: any) => {
         // Element does not exist, fail the test
-      await log(`  FAIL: Selector "${element.selector}" was not clicked.\n       ${error.message}`);
-      throw error;
+        await log(`  FAIL: Selector "${element.selector}" was not clicked.\n       ${error.message}`);
+        throw error;
       });
     }
   }
-  ASB.set("ELEMENT_EXISTS", false);
   return success;
 }
 
@@ -193,236 +188,120 @@ export async function findListElement(elementName: string): Promise<WebdriverIO.
 //   return element;
 // }
 
-// export async function getValidElement(
-//   elementOrString: WebdriverIO.Element | string,
-//   elementType: string
-// ): Promise<WebdriverIO.Element> {
-//   let found: boolean = true;
-//   let element: WebdriverIO.Element | null = null;
+export async function getValidElement(
+  element: WebdriverIO.Element,
+  elementType: string
+): Promise<WebdriverIO.Element> {
+  let found: boolean = true;
+  let newSelector: string = "";
+  let newElement: WebdriverIO.Element = element;
+  let elements: WebdriverIO.ElementArray;
+  let normalizedElementType: string = "";
+  let elementName: string = "";
+  let selector: string;
 
-//   let newSelector: string = "";
-//   let newElement: WebdriverIO.Element | null = null;
+  selector = element.selector.toString();
+  ASB.set("SELECTOR", selector);
 
-//   let elements: WebdriverIO.ElementArray | null = null;
-//   let normalizedElementType: string = "";
-//   let elementName: string = "";
-//   //Find as string 
-//   let selector: string
-//   let elementText: string = ""
+  try {
+    elements = await $$(selector);
+    if (elements.length === 0) {
+      // Extract the element type if not provided
+      if (elementType === "") {
+        let index: number = selector.indexOf("[");
+        normalizedElementType = selector.substring(0, index);
+      } else {
+        normalizedElementType = normalizeElementType(elementType);
+        if (selector.includes("//a")) {
+          normalizedElementType = "//a";
+        }
+      }
 
-//   // Find elements based on string alone
-//   if (typeof elementOrString === "string") {
+      elementName = "";
 
+      // Get the element name from the xpath or CSS selector
+      if (selector.startsWith("//") || selector.startsWith("(//")) {
+        const matchResult = selector.match(/=".*"/);
+        elementName = matchResult ? matchResult[0].slice(2, -1) : "";
+      } else {
+        // Extract text from CSS selector
+        if (selector.includes("'") || selector.includes(`"`)) {
+          // Extract 'text' or "text" from CSS selector
+          if (selector.includes("'")) {
+            const index = selector.indexOf("'");
+            elementName = selector.substring(0, selector.indexOf("'", index));
+          }
+          if (selector.includes(`"`)) {
+            const index = selector.indexOf(`"`);
+            elementName = selector.substring(0, selector.indexOf(`"`, index));
+          }
+        } else {
+          // Extract .text or #text from CSS selector
+          if (selector.startsWith(".") || selector.startsWith("#")) {
+            // remove first character of selector
+            elementName = selector.substring(1);
+          }
+        }
+      }
 
-//     let initialElementType: string; // Declare initialElementType variable
-//     let eleText = elementOrString;
-//     found = false;
+      switch (normalizedElementType) {
+        case "//a":
+          newSelector = `//button[contains(@type,"${elementName}")]`;
+          ASB.set("SELECTOR", newSelector);
+          break;
+        case "//button":
+          newSelector = `//a[contains(text(),"${elementName}")]`;
+          ASB.set("SELECTOR", newSelector);
+          found = await isElementVisible(await $(newSelector));
+          break;
+        case "//input":
+          newSelector = `//input[contains(@id,"${elementName}")]`;
+          ASB.set("SELECTOR", newSelector);
+          found = await isElementVisible(await $(newSelector));
+          if (!found) {
+            newSelector = `//input[contains(@name,"${elementName}")]`;
+            await isElementVisible(await $(newSelector));
+          }
+          break;
+        case "//select":
+          // Find a div with the text above a combobox
+          newSelector = `//div[contains(text(),"${elementName}")]//following::input`;
+          ASB.set("SELECTOR", newSelector);
+          found = await isElementVisible(await $(newSelector));
+          break;
+        case "//*":
+          newSelector = `//*[contains(@id,"${elementName}")]`;
+          ASB.set("SELECTOR", newSelector);
+          found = await isElementVisible(await $(newSelector));
+          break;
+        default:
+          found = false;
+          break;
+      }
 
-//     // Any close matches for this text string? 
-//     // CSS for Input
+      newElement = await $(newSelector);
+      found = await isElementVisible(newElement);
+      // Successful class switch
+      if (found) {
+        await log(
+          `  WARN: Replaced selector "${selector}" \n                   with selector "${newSelector}"`
+        );
+      }
+    }
+  } catch (error) {
+    found = false;
+  }
 
-//     switch (elementType) {
-//       case "button":
-//         // CSS for Button by type
-//         // Example: <button type="submit" class="btn btn-primary">Submit</button>
-//         selector = `button[type='${eleText}']`
-//         ASB.set("SELECTOR", selector);
+  if (!found) {
+    await log(`  ERROR: Unable to find selector "${selector}" class switched as selector "${newSelector}"`);
+  } else {
+    highlightOn(newElement) // Highlight the element
+  }
+  // set switchboard find success
+  ASB.set("ELEMENT_EXISTS", found);
 
-//         elements = await browser.$$(selector);
-//         found = elements.length > 0;
-
-//         // xPath for Button containing an element that contains text
-//         // Example: <button class="radius" type="submit"><i class="fa fa-2x fa-sign-in">Login</i></button>
-//         if (!found) {
-//           selector = `//button/*[text()='${eleText}']`
-//           ASB.set("SELECTOR", selector);
-
-//         }
-//         elements = await browser.$$(selector);
-//         found = elements.length > 0;
-
-//         // xPath for Button containing an element that contains text with transient spaces
-//         // <button class="radius" type="submit"><i class="fa fa-2x fa-sign-in"> Login</i></button>
-//         if (!found) {
-//           selector = `//button/*[contains(text(),'${eleText}')]`
-//           ASB.set("SELECTOR", selector);
-
-//         }
-//         break;
-
-//       case "field":
-//         selector = `input[id='${eleText}']`
-//         ASB.set("SELECTOR", selector);
-
-//         elements = await browser.$$(selector);
-//         found = elements.length > 0;
-
-//         if (!found) {
-//           selector = `input[name='${eleText}']`
-//           ASB.set("SELECTOR", selector);
-
-//         }
-//         break;
-
-//       case "list":
-//         selector = `select[id='${eleText}']`
-//         ASB.set("SELECTOR", selector);
-
-//         break;
-//     }
-
-//     elements = await browser.$$(selector);
-//     found = elements.length > 0;
-
-//     if (found) {
-//       element = elements[0];
-//     } else {
-//       // Any close matches for this text string?
-//       selector = `//*[contains(@id, '${eleText}') 
-//       or contains(@name, '${eleText}') 
-//       or contains(@type, '${eleText}') 
-//       or contains(@href, '${eleText}') 
-//       or contains(@placeholder, '${eleText}')]`;
-//       elements = await browser.$$(selector);
-
-//       found = elements.length > 0;
-//       if (found) {
-//         element = elements[0];
-//       }
-
-//       if (!found) {
-//         await log(`  FAIL: Did not find ${elements.length} "${eleText}" element with selector "${selector}"`);
-//         return null;
-//       }
-//     }
-//   } else {
-//     element = elementOrString;
-//   }
-
-//   /**
-//    * Find as Element
-//    * Get a collection of matching elements
-//    */
-//   newElement = element;
-//   selector = newElement.selector
-//   ASB.set("SELECTOR", selector);
-
-//   try {
-//     elements = await $$(selector);
-//     if (elements.length === 0) {
-//       // Extract the element type if not provided
-//       if (elementType === "") {
-//         let index: number = selector.indexOf("[");
-//         normalizedElementType = selector.substring(0, index);
-//       } else {
-//         normalizedElementType = normalizeElementType(elementType);
-//         if (selector.includes("//a")) {
-//           normalizedElementType = "//a";
-//         }
-//       }
-
-//       elementName = "";
-
-//       // Get the element name from the xpath or CSS selector
-//       if (selector.startsWith("//") || selector.startsWith("(//")) {
-
-//         elementName = selector.match(/=".*"/)[0].slice(2, -1);
-
-//       } else {
-
-//         // Extract text from CSS selector
-//         if (selector.includes("'") || selector.includes(`"`)) {
-
-//           // Extract 'text' or "text" from CSS selector
-//           if (selector.includes("'")) {
-//             const index = selector.indexOf("'");
-//             elementName = selector.substring(0, selector.indexOf("'", index));
-//           }
-
-//           if (selector.includes(`"`)) {
-//             const index = selector.indexOf(`"`);
-//             elementName = selector.substring(0, selector.indexOf(`"`, index));
-//           }
-//         } else {
-//           // Extract .text or #text from CSS selector
-//           if (selector.startsWith(".") || selector.startsWith("#")) {
-//             // remove first character of selector
-//             elementName = selector.substring(1);
-//           }
-//         }
-//       }
-
-//       switch (normalizedElementType) {
-//         case "//a":
-
-//           newSelector = `//button[contains(@type,"${elementName}")]`;
-//           ASB.set("SELECTOR", newSelector);
-
-//           break;
-
-//         case "//button":
-
-//           newSelector = `//a[contains(text(),"${elementName}")]`;
-//           ASB.set("SELECTOR", newSelector);
-//           found = await isElementVisible(await $(newSelector));
-//           break;
-
-//         case "//input":
-
-
-//           newSelector = `//input[contains(@id,"${elementName}")]`;
-//           ASB.set("SELECTOR", newSelector);
-//           found = await isElementVisible(await $(newSelector));
-//           if (!found) {
-//             newSelector = `//input[contains(@name,"${elementName}")]`;
-//             await isElementVisible(await $(newSelector));
-//           }
-//           break;
-
-//         case "//select":
-
-//           // Find a div with the text above a combobox
-//           newSelector = `//div[contains(text(),"${elementName}")]//following::input`;
-//           ASB.set("SELECTOR", newSelector);
-//           found = await isElementVisible(await $(newSelector));
-//           break;
-
-//         case "//*":
-
-//           newSelector = `//*[contains(@id,"${elementName}")]`;
-//           ASB.set("SELECTOR", newSelector);
-//           found = await isElementVisible(await $(newSelector));
-//           break;
-
-//         default:
-//           found = false;
-//           break;
-//       }
-
-//       newElement = await $(newSelector);
-//       found = await isElementVisible(newElement);
-//       // Successful class switch
-//       if (found) {
-//         await log(
-//           `  WARN: Replaced selector "${selector}" \n                   with selector "${newSelector}"`
-//         );
-//       }
-//     }
-//   } catch (error) {
-//     found = false;
-//   }
-
-//   if (!found) {
-//     await log(`  ERROR: Unable to find selector "${selector}" class switched as selector "${newSelector}"`);
-//   } else {
-//     highlightOn(newElement) // Highlight the element
-//   }
-//   // set switchboard find success
-//   ASB.set("ELEMENT_EXISTS", found)
-
-//   return newElement;
-// }
-
+  return newElement;
+}
 
 async function getElementType(element: WebdriverIO.Element) {
   // get from existing element
@@ -874,74 +753,68 @@ export async function pageSync(
 //   return await (inputField.selectByVisibleText(item));
 // }
 
-// export async function setValueAdv(
-//   inputField: WebdriverIO.Element | string,
-//   text: string
-// ): Promise<boolean> {
-//   let success: boolean = false;
+export async function setValueAdv(
+  inputField: WebdriverIO.Element,
+  text: string
+): Promise<boolean> {
+  let success: boolean = false;
 
-//   // Take an string or element and return a valid element - set EXISTS in the switchboard
-//   inputField = await getValidElement(inputField, "field");
+  // Take an string or element and return a valid element - set EXISTS in the switchboard
+  inputField = await getValidElement(inputField, "field");
 
 
-//   const SELECTOR = inputField.selector.toString();
+  const SELECTOR = inputField.selector.toString();
 
-//   let newValue: string = replaceTags(text);
-//   let scrubbedValue: string = newValue
-//   let fieldName: string = await getFieldName(inputField)
+  let newValue: string = replaceTags(text);
+  let scrubbedValue: string = newValue
+  let fieldName: string = await getFieldName(inputField)
 
-//   //Mask Passwords in output
-//   if (fieldName.includes("ssword")) {
-//     scrubbedValue = maskValue(scrubbedValue)
-//   }
+  //Mask Passwords in output
+  if (fieldName.includes("ssword")) {
+    scrubbedValue = maskValue(scrubbedValue)
+  }
 
-//   await log(`Entering "${scrubbedValue}" into selector "${SELECTOR}"`);
+  await log(`Entering "${scrubbedValue}" into selector "${SELECTOR}"`);
 
-//   try {
-//     //await element.waitForDisplayed();
+  try {
+    if (!(await isElementInViewport(inputField))) {
+      await scrollIntoView(inputField);
+    }
 
-//     if (!(await isElementInViewport(inputField))) {
-//       await scrollIntoView(inputField);
-//       await waitForElementToStopMoving(inputField, 2000);
-//     }
+    await highlightOn(inputField);
 
-//     await highlightOn(inputField);
+    //Check if text was entered
+    // Clear input field
+    await inputField.click();
 
-//     //Check if text was entered
-//     // Clear input field
-//     await inputField.click();
+    // Clear the field.
+    await inputField.setValue("");
 
-//     // Clear the field.
-//     await inputField.setValue("");
+    // Check for accuracy
+    if (!(await inputField.getValue()).includes(text)) {
+      await inputField.setValue("");
+      // Send text to input field character by character
+      for (const letter of text) {
+        await inputField.addValue(letter);
+      }
+    }
 
-//     // Check for accuracy
-//     if (!(await inputField.getValue()).includes(text)) {
-//       await inputField.setValue("");
-//       // Send text to input field character by character
-//       for (const letter of text) {
-//         await inputField.addValue(letter);
-//       }
-//     }
-
-//     success = true;
-//   } catch (error: any) {
-
-//     if (ASB.get(IF_EXISTS) === true) {
-//       await log(`  WARN: setValueAdvIfExists - Skipped entering "${scrubbedValue}" in selector "${SELECTOR}" without failing the test`);
-//       ASB.set(IF_EXISTS, false)
-//       return true;
-
-//     } else {
-
-//       await log(
-//         `  ERROR: ${SELECTOR} was not populated with "${scrubbedValue}".\n       ${error.message}`
-//       );
-//       // Throw the error to stop the test, still masking password
-//       await inputField.setValue(scrubbedValue);
-//     }
-//   }
-//   return success;
-// }
+    success = true;
+  } catch (error: any) {
+    if (ASB.get(IF_EXISTS) === true) {
+      await log(`  WARN: setValueAdvIfExists - Skipped entering "${scrubbedValue}" in selector "${SELECTOR}" without failing the test`);
+      ASB.set(IF_EXISTS, false)
+      return true;
+    } else {
+      await log(
+        `  ERROR: ${SELECTOR} was not populated with "${scrubbedValue}".\n       ${error.message}`
+      );
+      // Throw the error to stop the test, still masking password
+      await inputField.setValue(scrubbedValue);
+    }
+  }
+  return success;
+}
 
 /**
  * Wrapper for browser.pause
