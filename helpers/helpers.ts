@@ -206,17 +206,7 @@ export async function getValidElement(
   try {
     elements = await $$(selector);
     if (elements.length === 0) {
-      // Extract the element type if not provided
-      if (elementType === "") {
-        let index: number = selector.indexOf("[");
-        normalizedElementType = selector.substring(0, index);
-      } else {
-        normalizedElementType = normalizeElementType(elementType);
-        if (selector.includes("//a")) {
-          normalizedElementType = "//a";
-        }
-      }
-
+      normalizedElementType = normalizeElementType(elementType);
       elementName = "";
 
       // Get the element name from the xpath or CSS selector
@@ -324,21 +314,16 @@ async function getElementType(element: WebdriverIO.Element) {
 * @returns {string | null} The field name, or null if no properties have a value
 */
 
-async function getFieldName(element: WebdriverIO.Element) {
-
-  // Get the 'name' property of the element
+async function getFieldName(element: WebdriverIO.Element): Promise<string> {
   const name = await element.getAttribute("name");
   if (name) return name;
 
-  // Get the 'placeholder' property of the element
   const placeholder = await element.getAttribute("placeholder");
   if (placeholder) return placeholder;
 
-  // Get the 'type' property of the element
   const type = await element.getAttribute("type");
   if (type) return type;
 
-  // Return the 'class' property of the element if others are empty
   const className = await element.getAttribute("class");
 
   if (className == "input") {  // combobox
@@ -622,7 +607,7 @@ function normalizeElementType(elementType: string) {
       elementText = "//p";
       break;
     default:
-    //   global.log(`WARN: Unable to normalize element type ${elementType}`);
+      global.log(`WARN: Unable to normalize element type ${elementType}`);
   }
   return elementText;
 }
@@ -762,39 +747,34 @@ export async function setValueAdv(
   // Take an string or element and return a valid element - set EXISTS in the switchboard
   inputField = await getValidElement(inputField, "field");
 
-
   const SELECTOR = inputField.selector.toString();
 
   let newValue: string = replaceTags(text);
-  let scrubbedValue: string = newValue
-  let fieldName: string = await getFieldName(inputField)
+  let scrubbedValue: string = newValue;
+  let fieldName: string = await getFieldName(inputField);
 
   //Mask Passwords in output
   if (fieldName.includes("ssword")) {
-    scrubbedValue = maskValue(scrubbedValue)
+    scrubbedValue = maskValue(scrubbedValue);
   }
-
   await log(`Entering "${scrubbedValue}" into selector "${SELECTOR}"`);
 
   try {
     if (!(await isElementInViewport(inputField))) {
       await scrollIntoView(inputField);
+      await waitForElementToStopMoving(inputField, 2000);
     }
 
     await highlightOn(inputField);
-
-    //Check if text was entered
-    // Clear input field
     await inputField.click();
 
-    // Clear the field.
-    await inputField.setValue("");
+    await inputField.setValue(newValue);
 
     // Check for accuracy
-    if (!(await inputField.getValue()).includes(text)) {
-      await inputField.setValue("");
+    if (!(await inputField.getValue()).includes(newValue)) {
+      await inputField.clearValue();
       // Send text to input field character by character
-      for (const letter of text) {
+      for (const letter of newValue) {
         await inputField.addValue(letter);
       }
     }
@@ -851,21 +831,20 @@ function replaceTags(text: string) {
 
         const match = tag.match(/[+-](\d+)/);
         if (match) {
-          const days = parseInt(match[0]);
+          days = parseInt(match[0]);
         }
-
         newText = newText.replace(tag, getToday(days, format));
         break;
 
       default:
-        // log(`ERROR: Unknown tag <${tag}>`);
+        log(`ERROR: Unknown tag <${tag}>`);
         break;
     }
     match = newText.match(/\<(.*?)\>/);
   }
 
   if (newText !== text) {
-    // log(`    Replaced tags in '${text}' with '${newText}'`);
+    log(`    Replaced tags in '${text}' with '${newText}'`);
   }
   return newText;
 }
