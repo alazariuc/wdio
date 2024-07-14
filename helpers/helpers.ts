@@ -204,6 +204,7 @@ export async function getValidElement(
   ASB.set("SELECTOR", selector);
 
   try {
+    await waitForSpinner();
     elements = await $$(selector);
     if (elements.length === 0) {
       normalizedElementType = normalizeElementType(elementType);
@@ -285,7 +286,7 @@ export async function getValidElement(
   if (!found) {
     await log(`  ERROR: Unable to find selector "${selector}" class switched as selector "${newSelector}"`);
   } else {
-    highlightOn(newElement) // Highlight the element
+    await highlightOn(newElement) // Highlight the element
   }
   // set switchboard find success
   ASB.set("ELEMENT_EXISTS", found);
@@ -951,13 +952,14 @@ export async function sleep(ms: number) {
 export async function waitForSpinner(): Promise<boolean> {
   let spinnerDetected: boolean = false;
   // This spinner locator is unique to each project
-  const spinnerLocator: string = `//img[contains(@src,'loader')]`;
+  const spinnerLocator: string = `[class*="loading"]`;
   await pause(100); // Let browser begin building spinner on page
   let spinner = await browser.$(spinnerLocator);
   let found = await highlightOn(spinner);
   let timeout = ASB.get("spinnerTimeoutInSeconds");
   const t0 = Date.now();
   if (found) {
+    await scrollIntoView(spinner);
     const startTime = performance.now();
     // display this message in yellow
     await log(
@@ -999,158 +1001,171 @@ export async function waitForSpinner(): Promise<boolean> {
 //   return result;
 // }
 
+async function convertCssSelectorToXPath(cssSelector: string) {
+  return browser.execute(function (cssSelector) {
+    function getElementXPath(element: Element | null) {
+      if (!element || element.nodeType !== 1) return '';
+
+      let path = '';
+      while (element && element.nodeType === 1) {
+        const index = element.parentNode
+          ? Array.prototype.indexOf.call(element.parentNode.childNodes, element) + 1
+          : 0;
+        const tag = element.tagName.toLowerCase();
+        const xpathIndex = index > 1 ? `[${index}]` : '';
+        path = `/${tag}${xpathIndex}${path}`;
+        element = element.parentNode as Element;
+      }
+      return path;
+    }
+
+    const targetElement = document.querySelector(cssSelector);
+    return getElementXPath(targetElement);
+  }, cssSelector);
+}
+
+async function handleSelector(selector: string, isXPath: boolean) {
+  if (!isXPath) {
+    const cssSelector = selector;
+    const xpath = await convertCssSelectorToXPath(cssSelector);
+    selector = xpath;
+  }
+  return selector;
+}
+
+export async function selectAdv(
+  listElement: WebdriverIO.Element,
+  item: string
+): Promise<boolean> {
+  let success: boolean = false;
+  let itemValue: String = "No Item selected";
+  let listItems: WebdriverIO.ElementArray;
+  let textContent: string = " ";
+
+  // Empty item list - do nothing
+  if (item.length === 0) {
+    await log(`  ERROR: ${listElement} had no list item passed.\n`);
+    return true;
+  }
+
+  //Get a valid list element
+  //const validListElement = await getValidElement(listElement as WebdriverIO.Element, "list");
+  const validListElement = await getValidElement(listElement, "list");
+  await scrollIntoView(validListElement);
+  // Get the name of the element
+
+  let selector = validListElement.selector.toString();
+  let isXPath = selector.includes("//");
+
+  selector = await handleSelector(selector, isXPath);
+  // Comboboxes look like input fields
+  let isCombobox = selector.toLowerCase().includes("/input");
+
+  //Scroll into view if not inside the virtual viewport
+  if (!(await isElementInViewport(validListElement))) {
+    await scrollIntoView(validListElement);
+    await waitForElementToStopMoving(validListElement, 3000);
+  }
+
+  if (isCombobox) {
+    await listElement.doubleClick() //Selects all the text in the combobox
+
+    // Allow user to pass a number like 3 for March
+    if (typeof (item) === 'number') {
+
+      // Try number select
+      const index: number = item;
+      try {
+        await (await $(`//span[normalize-space()='${item}']`)).click();
+        await browser.pause(125) // Wait for box to open
+        itemValue = await validListElement.getText();
+        // Report actual item selected
+        global.log(`  Item selected: "${itemValue}"`)
+        success = true;
+      } catch (error: any) {
+
+        if (ASB.get(IF_EXISTS) === true) {
+          await log(`  WARN: SelectAdvIfExists - Skipped selecting "${item}" in combobox selector \`${ASB.get("ELEMENT_SELECTOR")}\` without failing the test`);
+          ASB.set(IF_EXISTS, false)
+          return true;
+        }
+
+        await log(`  ERROR: ${listElement} could not select "${item}" was not selected\n
+        ${error.message}`);
+      }
+    } else {
+      // Clear the field.
+      await validListElement.click() // Select All Clear Mac and Windows
+      await browser.keys(['Home']);
+      await browser.keys(['Shift', 'End']);
+      await browser.keys(['Delete']);
+      await browser.keys(`${item}`)
+
+      await browser.pause(300); // Wait for the list to expand
+
+      // Find the item in the list
+      let items: string[] = []; // List of strings in the combobox
+      let found = false;
+      try {
+        listItems = await browser.$$(`//li/*`)
+
+        for (const listItem of listItems) {
+          highlightOn(listItem) // Highlight the element
+          items.push(await listItem.getText())
+
+          if ((await listItem.getText()).includes(item)) {  // Found the element
+            found = true
+            break;
+          }
+          highlightOff(listItem) // Highlight the element
+        }
 
 
-// export async function selectAdv(
-//   listElement: WebdriverIO.Element | string,
-//   item: string
-// ): Promise<boolean> {
-//   let success: boolean = false;
-//   let itemValue: String = "No Item selected"
-//   let listItems: WebdriverIO.Element[]
-//   let textContent: string = " "
+      } catch (error) {
+        // no such item
+        if (ASB.get(IF_EXISTS) === true) {
+          await log(`  WARN: SelectAdvIfExists - Skipped selecting "${item}" in selector "${ASB.get("ELEMENT_SELECTOR")}" without failing the test`);
+          ASB.set(IF_EXISTS, false)
+          return true;
+        }
 
-//   // Empty item list - do nothing
-//   if (item.length === 0) {
-//     // await log(`  ERROR: ${listElement} had no list item passed.\n`);
-//     return true;
-//   }
+        listItems = await browser.$$(`//li/*`)
+        for (const listItem of listItems) {
+          textContent += await listItem.getText() + " | "; // Get the text content of the element
+        }
+        await log(`  ERROR: "${item}" was not found in combobox: \n ${textContent}`)
+      }
+      await browser.keys('Enter');
+    }
 
-//   //Get a valid list element
-//   //const validListElement = await getValidElement(listElement as WebdriverIO.Element, "list");
-//   const validListElement = await getValidElement(listElement, "list");
-//   await scrollIntoView(validListElement);
-//   // Get the name of the element
+  } else {
 
-//   let selector = validListElement.selector.toString()
-//   let isXPath = selector.includes("//");
+    try {
+      // Get the list of options in the select element
+      const optionsList: string = await getListValues(validListElement);
+      await log(optionsList);
 
+      if (typeof (item) === 'number') {
+        const index: number = item;
+        await validListElement.selectByIndex(index);
+      } else {
+        await validListElement.selectByVisibleText(item);
+      }
+      global.log(`  Item selected: "${item}"`)
+      success = true;
+    } catch (error: any) {
+      if (ASB.get(IF_EXISTS) === true) {
+        await log(`  WARN: SelectAdvIfExists - Skipped selecting item number "${item}" in selector "${ASB.get("ELEMENT_SELECTOR")}" without failing the test`);
+        ASB.set(IF_EXISTS, false)
+        return true;
+      }
+      await log(`  ERROR: ${listElement} could not select "${item}"\n
+      ${error.message}`);
+    }
 
-//   if (!isXPath) {
-//     let cssSelector = selector
-//     let xpath = await browser.execute(function (cssSelector) {
-//       let element = document.querySelector(cssSelector);
-//       let xpath = '';
-//       //@ts-ignore - TS does not like the element variable, but this works
-//       for (; element && element.nodeType == 1; element = element.parentNode) {
-//         let id = Array.prototype.indexOf.call(element.parentNode.childNodes, element) + 1;
-//         id > 1 ? (id = '[' + id + ']') : (id = '');
-//         xpath = '/' + element.tagName + id + xpath;
-//       }
-//       return xpath;
-//     }, cssSelector);
-//     selector = xpath;
-//   }
-//   // Comboboxes look like input fields
-//   let isCombobox = selector.toLowerCase().includes("/input");
-
-//   //Scroll into view if not inside the virtual viewport
-//   if (!(await isElementInViewport(validListElement))) {
-//     await scrollIntoView(validListElement);
-//     await waitForElementToStopMoving(validListElement, 3000);
-//   }
-
-//   if (isCombobox) {
-//     //@ts-ignore
-//     await listElement.doubleClick() //Selects all the text in the combobox
-
-
-//     // Allow user to pass a number like 3 for March
-//     if (typeof (item) === 'number') {
-
-//       // Try number select
-//       const index: number = item;
-//       try {
-//         await (await $(`//span[normalize-space()='${item}']`)).click();
-//         await browser.pause(125) // Wait for box to open
-//         itemValue = await validListElement.getText();
-//         // Report actual item selected
-//         global.log(`  Item selected: "${itemValue}"`)
-//         success = true;
-//       } catch (error: any) {
-
-//         if (ASB.get(IF_EXISTS) === true) {
-//           await log(`  WARN: SelectAdvIfExists - Skipped selecting "${item}" in combobox selector \`${ASB.get("ELEMENT_SELECTOR")}\` without failing the test`);
-//           ASB.set(IF_EXISTS, false)
-//           return true;
-//         }
-
-//         await log(`  ERROR: ${listElement} could not select "${item}" was not selected\n
-//         ${error.message}`);
-//       }
-//     } else {
-//       // Clear the field.
-//       await validListElement.click() // Select All Clear Mac and Windows
-//       await browser.keys(['Home']);
-//       await browser.keys(['Shift', 'End']);
-//       await browser.keys(['Delete']);
-//       await browser.keys(`${item}`)
-
-//       await browser.pause(300); // Wait for the list to expand
-
-//       // Find the item in the list
-//       let items: string[] = []; // List of strings in the combobox
-//       let found = false;
-//       try {
-//         listItems = await browser.$$(`//li/*`)
-
-//         for (const listItem of listItems) {
-//           highlightOn(listItem) // Highlight the element
-//           items.push(await listItem.getText())
-
-//           if ((await listItem.getText()).includes(item)) {  // Found the element
-//             found = true
-//             break;
-//           }
-//           highlightOff(listItem) // Highlight the element
-//         }
-
-
-//       } catch (error) {
-//         // no such item
-//         if (ASB.get(IF_EXISTS) === true) {
-//           await log(`  WARN: SelectAdvIfExists - Skipped selecting "${item}" in selector "${ASB.get("ELEMENT_SELECTOR")}" without failing the test`);
-//           ASB.set(IF_EXISTS, false)
-//           return true;
-//         }
-
-//         listItems = await browser.$$(`//li/*`)
-//         for (const listItem of listItems) {
-//           textContent += await listItem.getText() + " | "; // Get the text content of the element
-//         }
-//         await log(`  ERROR: "${item}" was not found in combobox: \n ${textContent}`)
-//       }
-//       await browser.keys('Enter');
-//     }
-
-//   } else {
-
-//     try {
-//       // Get the list of options in the select element
-//       const optionsList: string = await getListValues(validListElement);
-//       console.log(optionsList); // This will print the list of options text in the select element
-
-//       if (typeof (item) === 'number') {
-//         const index: number = item;
-//         await (await validListElement).selectByIndex(index);
-//       } else {
-//         await (await validListElement).selectByVisibleText(item)
-//       }
-//       global.log(`  Item selected: "${item}"`)
-//       success = true;
-//     } catch (error: any) {
-//       if (ASB.get(IF_EXISTS) === true) {
-//         await log(`  WARN: SelectAdvIfExists - Skipped selecting item number "${item}" in selector "${ASB.get("ELEMENT_SELECTOR")}" without failing the test`);
-//         ASB.set(IF_EXISTS, false)
-//         return true;
-//       }
-//       await log(`  ERROR: ${listElement} could not select "${item}"\n
-//       ${error.message}`);
-//     }
-
-//   }
-//   return success;
-// }
+  }
+  return success;
+}
 
 //Resolves stale element
 export async function refreshElement(
@@ -1174,10 +1189,8 @@ async function findElement(selector: string): Promise<WebdriverIO.Element> {
   }
 }
 
-export async function getListValues(selectElement: WebdriverIO.Element
-): Promise<string> {
-
-  const optionElements = await (await selectElement).getText();
+export async function getListValues(selectElement: WebdriverIO.Element): Promise<string> {
+  const optionElements = await selectElement.getText();
   return optionElements;
 }
 
